@@ -2,3 +2,5 @@
 Short CMD for Windows Disk Cleanup using a predefined CleanMgr profile and clears user and system TEMP folders (including hidden files). Designed for administrative system maintenance and troubleshooting.
 
 V1.1 addad a feature to show how much space is freed in form of a report. 
+
+v1.2 extends the cleanup by removing additional safe Windows system caches and log files, increasing cleanup coverage while remaining low risk.
