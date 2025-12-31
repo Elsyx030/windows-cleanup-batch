@@ -1,11 +1,16 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-REM ======================================
-REM  windows-cleanup-batch v1.1
-REM  Feature:
-REM   - Shows freed disk space on drive C:
-REM ======================================
+REM ==================================================
+REM  windows-cleanup-batch v1.2
+REM
+REM  Features:
+REM   - Disk Cleanup via CleanMgr (profile 99)
+REM   - TEMP cleanup (user + system)
+REM   - Safe system caches
+REM   - Extended system cleanup (WER, logs, caches)
+REM   - Space Report (before/after, MB)
+REM ==================================================
 
 title Windows Cleanup Tool
 
@@ -27,15 +32,16 @@ if not exist "%LOGROOT%" mkdir "%LOGROOT%" >nul 2>&1
 for /f %%A in ('powershell -NoProfile -Command "Get-Date -Format yyyy-MM-dd_HHmmss"') do set TS=%%A
 set "LOG=%LOGROOT%\cleanup_%TS%.log"
 
-echo ==== windows-cleanup-batch v1.1 ==== > "%LOG%"
+echo ==== windows-cleanup-batch v1.2 ==== > "%LOG%"
 echo Start: %DATE% %TIME% >> "%LOG%"
 echo. >> "%LOG%"
 
 echo [INFO] Log: "%LOG%"
-echo [INFO] Running Disk Cleanup (profile 99)...
-echo [INFO] Running Disk Cleanup (profile 99)... >> "%LOG%"
 
 REM ---------- Disk Cleanup ----------
+echo [INFO] Running Disk Cleanup (CleanMgr profile 99)...
+echo [INFO] Running Disk Cleanup (CleanMgr profile 99)... >> "%LOG%"
+
 where cleanmgr >nul 2>&1
 if %errorlevel% neq 0 (
     echo [ERROR] cleanmgr not found.
@@ -50,30 +56,30 @@ REM ---------- TEMP Cleanup ----------
 echo [INFO] Clearing TEMP folders...
 echo [INFO] Clearing TEMP folders... >> "%LOG%"
 
-echo [INFO] User TEMP: %TEMP%
-echo [INFO] User TEMP: %TEMP% >> "%LOG%"
-del /f /s /q "%TEMP%\*" >nul 2>&1
-for /d %%D in ("%TEMP%\*") do rd /s /q "%%D" >nul 2>&1
+call :ClearFolder "%TEMP%" "User TEMP"
+call :ClearFolder "C:\Windows\Temp" "Windows TEMP"
 
-echo [INFO] Windows TEMP: C:\Windows\Temp
-echo [INFO] Windows TEMP: C:\Windows\Temp >> "%LOG%"
-del /f /s /q "C:\Windows\Temp\*" >nul 2>&1
-for /d %%D in ("C:\Windows\Temp\*") do rd /s /q "%%D" >nul 2>&1
+REM ---------- Safe System Caches ----------
+echo [INFO] Clearing safe system caches...
+echo [INFO] Clearing safe system caches... >> "%LOG%"
 
-REM ---------- Extra safe system caches ----------
-echo [INFO] Clearing extra system caches...
-echo [INFO] Clearing extra system caches... >> "%LOG%"
+call :ClearFolder "C:\Windows\SoftwareDistribution\Download" "Windows Update Cache"
+call :ClearFolder "C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache" "Delivery Optimization Cache"
 
-del /f /s /q "C:\Windows\SoftwareDistribution\Download\*" >nul 2>&1
-for /d %%D in ("C:\Windows\SoftwareDistribution\Download\*") do rd /s /q "%%D" >nul 2>&1
+REM ---------- Extended System Cleanup (v1.2) ----------
+echo [INFO] Running extended system cleanup...
+echo [INFO] Running extended system cleanup... >> "%LOG%"
 
-del /f /s /q "C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*" >nul 2>&1
-for /d %%D in ("C:\Windows\ServiceProfiles\NetworkService\AppData\Local\Microsoft\Windows\DeliveryOptimization\Cache\*") do rd /s /q "%%D" >nul 2>&1
+call :ClearFolder "C:\ProgramData\Microsoft\Windows\WER\ReportQueue" "WER ReportQueue"
+call :ClearFolder "C:\ProgramData\Microsoft\Windows\WER\ReportArchive" "WER ReportArchive"
+call :ClearFolder "C:\Windows\Logs\CBS" "CBS Logs"
+call :ClearFolder "C:\Windows\Panther" "Windows Panther Logs"
+call :ClearFolder "C:\ProgramData\Microsoft\Windows\Caches" "Windows Caches"
 
 REM ---------- Measure free space AFTER ----------
 for /f %%A in ('powershell -NoProfile -Command "(Get-PSDrive C).Free"') do set FREE_AFTER=%%A
 
-REM ---------- Calculate & display result ----------
+REM ---------- Calculate & display Space Report ----------
 set /a BEFORE_MB=FREE_BEFORE/1024/1024
 set /a AFTER_MB=FREE_AFTER/1024/1024
 set /a FREED_MB=AFTER_MB-BEFORE_MB
@@ -97,3 +103,23 @@ echo End: %DATE% %TIME% >> "%LOG%"
 echo [OK] Cleanup finished.
 pause
 exit /b 0
+
+
+REM ---------- Helper: ClearFolder ----------
+:ClearFolder
+set "TARGET=%~1"
+set "LABEL=%~2"
+
+echo [INFO] %LABEL%: %TARGET%
+echo [INFO] %LABEL%: %TARGET% >> "%LOG%"
+
+if not exist "%TARGET%" (
+    echo [WARN] Path not found: %TARGET%
+    echo [WARN] Path not found: %TARGET% >> "%LOG%"
+    goto :eof
+)
+
+del /f /s /q "%TARGET%\*" >nul 2>&1
+for /d %%D in ("%TARGET%\*") do rd /s /q "%%D" >nul 2>&1
+
+goto :eof
